@@ -9,7 +9,7 @@ export default function Header({
 }: {
   dateLabel: string;
   phase: string;
-  active: "board" | "review";
+  active: "board" | "crm" | "review";
 }) {
   async function signOut() {
     await supabaseBrowser().auth.signOut();
@@ -26,6 +26,9 @@ export default function Header({
       <nav className="navlinks">
         <a href="/" aria-current={active === "board" ? "page" : undefined}>
           Board
+        </a>
+        <a href="/crm" aria-current={active === "crm" ? "page" : undefined}>
+          CRM
         </a>
         <a href="/review" aria-current={active === "review" ? "page" : undefined}>
           Review

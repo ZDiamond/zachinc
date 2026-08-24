@@ -15,11 +15,37 @@ import Scoreboard from "@/components/Scoreboard";
 import Optionality from "@/components/Optionality";
 import CeoClose from "@/components/CeoClose";
 import Checkpoints from "@/components/Checkpoints";
+import Crm from "@/components/Crm";
+import PipelineAlert from "@/components/PipelineAlert";
+import type { Opportunity } from "@/lib/crm";
 
 /**
  * Design preview with representative data. Local only: this route does not
  * exist in production, so it can never be a way around the sign-in.
  */
+
+const SAMPLE_OPPS: Opportunity[] = [
+  { id: "1", name: "Joubin", org: "Roadrunner AI", lane: "roles", tier: 1, strength: 4, energy: 5,
+    value: "Head of GTM, founder-facing", currency: "runway", status: "active",
+    next_step: "Ask for the decision timeline and written charter", next_step_on: "2026-08-24",
+    last_contact_on: "2026-08-21", notes: "" },
+  { id: "2", name: "Becky", org: "", lane: "advisory", tier: 1, strength: 5, energy: 4,
+    value: "Integrated campaign sprint, 4 weeks", currency: "runway", status: "proposal",
+    next_step: "Send pricing for the sprint", next_step_on: "2026-08-21",
+    last_contact_on: "2026-08-20", notes: "" },
+  { id: "3", name: "Davis", org: "", lane: "network", tier: 1, strength: 4, energy: 4,
+    value: "Two founder intros", currency: "relationships", status: "active",
+    next_step: "", next_step_on: null, last_contact_on: "2026-08-24", notes: "" },
+  { id: "4", name: "Carla Mendez", org: "Mendez HVAC", lane: "substance", tier: 2, strength: 1,
+    energy: 3, value: "Operator interview 1 of 6", currency: "proof", status: "new",
+    next_step: "Book the workflow walkthrough", next_step_on: "2026-08-27",
+    last_contact_on: null, notes: "" },
+  { id: "5", name: "Nicole", org: "Cognition", lane: "network", tier: 2, strength: 5, energy: 3,
+    value: "Reference language in writing", currency: "reputation", status: "active",
+    next_step: "Get the agreed narrative in writing", next_step_on: null,
+    last_contact_on: "2026-08-14", notes: "" },
+];
+
 export default function PreviewPage({ searchParams }: { searchParams: { date?: string } }) {
   if (process.env.NODE_ENV === "production") notFound();
 
@@ -110,6 +136,14 @@ export default function PreviewPage({ searchParams }: { searchParams: { date?: s
             { id: "d", title: "Personal copies of every employment doc filed", done: true, added_on: "2026-08-21", sort: 3 },
           ]}
         />
+      </section>
+
+      <section>
+        <PipelineAlert rows={SAMPLE_OPPS} today={today} />
+      </section>
+
+      <section>
+        <Crm userId={uid} today={today} initial={SAMPLE_OPPS} />
       </section>
 
       <section>

@@ -32,6 +32,8 @@ import CeoClose from "@/components/CeoClose";
 import Checkpoints from "@/components/Checkpoints";
 import CalendarNotice from "@/components/CalendarNotice";
 import SetupNeeded from "@/components/SetupNeeded";
+import PipelineAlert from "@/components/PipelineAlert";
+import type { Opportunity } from "@/lib/crm";
 import { missingCoreEnv } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
@@ -70,7 +72,7 @@ export default async function BoardPage() {
   const ctx = dayContext(today);
 
   // Everything this page needs, in parallel.
-  const [dayRes, weekRes, todoRes, weekDaysRes, calendar] = await Promise.all([
+  const [dayRes, weekRes, todoRes, weekDaysRes, oppRes, calendar] = await Promise.all([
     supabase.from("days").select("*").eq("user_id", user.id).eq("date", today).maybeSingle(),
     supabase
       .from("weeks")
@@ -90,12 +92,14 @@ export default async function BoardPage() {
       .eq("user_id", user.id)
       .gte("date", ctx.weekStart)
       .lte("date", addDays(ctx.weekStart, 6)),
+    supabase.from("opportunities").select("*").eq("user_id", user.id),
     fetchDayEvents(user.id, today, TZ),
   ]);
 
   const day = dayRes.data ?? null;
   const week = weekRes.data ?? null;
   const todos = (todoRes.data ?? []) as Todo[];
+  const opportunities = (oppRes.data ?? []) as Opportunity[];
 
   const liftsDoneThisWeek = (weekDaysRes.data ?? [])
     .filter((d: { workout_done: boolean; workout_key: string | null }) => d.workout_done && d.workout_key)
@@ -273,6 +277,10 @@ export default async function BoardPage() {
 
       <section>
         <Todos userId={user.id} today={today} initial={todos} />
+      </section>
+
+      <section>
+        <PipelineAlert rows={opportunities} today={today} />
       </section>
 
       <section>
