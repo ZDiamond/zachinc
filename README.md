@@ -38,10 +38,12 @@ earlier, or later, but it does not disappear.
 
 ### 1. Supabase
 
-Create a project, then run `supabase/migrations/0001_init.sql` in the SQL
-editor. It creates four tables with RLS on all of them. `google_tokens` has no
-policies at all by design: only the server's service-role key can read it, so a
-leaked anon key cannot reach the calendar tokens.
+Project: `zachinc` (`dvfknmzpwddmgvbewmpj`, us-east-2). The schema in
+`supabase/migrations/0001_init.sql` is already applied. It creates five tables
+with RLS on all of them. `google_tokens` has no policies at all by design: only
+the server's service-role key can read it, so a leaked anon key cannot reach
+the calendar tokens. The linter flags that table as "RLS enabled, no policy",
+which is the intended state.
 
 Under **Authentication > Providers > Google**, enable Google and paste in the
 client ID and secret from step 2.
@@ -51,7 +53,7 @@ client ID and secret from step 2.
 Create an OAuth 2.0 Client ID (type: Web application) at console.cloud.google.com:
 
 - Enable the **Google Calendar API** for the project.
-- Authorized redirect URI: `https://YOUR-PROJECT.supabase.co/auth/v1/callback`
+- Authorized redirect URI: `https://dvfknmzpwddmgvbewmpj.supabase.co/auth/v1/callback`
 - On the OAuth consent screen, add the scope
   `https://www.googleapis.com/auth/calendar.readonly`
 - While the app is in "Testing", add the Google account as a test user.
