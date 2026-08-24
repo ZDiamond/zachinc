@@ -133,3 +133,29 @@ create trigger weeks_touch before update on weeks
 drop trigger if exists google_tokens_touch on google_tokens;
 create trigger google_tokens_touch before update on google_tokens
   for each row execute function touch_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- Board meeting reviews. One row per checkpoint (Day 30 / 60 / 90): the lane
+-- scorecard and the memo. Kept apart from `weeks` because a checkpoint spans
+-- several weeks and is a different kind of decision.
+-- ---------------------------------------------------------------------------
+create table if not exists reviews (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  checkpoint_day int not null,
+  lanes jsonb not null default '{}'::jsonb,
+  memo text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (user_id, checkpoint_day)
+);
+
+alter table reviews enable row level security;
+
+create policy "reviews are private" on reviews
+  for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop trigger if exists reviews_touch on reviews;
+create trigger reviews_touch before update on reviews
+  for each row execute function touch_updated_at();

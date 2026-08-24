@@ -316,3 +316,71 @@ export const BEAT_THE_FREEDOM_GATES = [
 
 export const STANDING_RULE =
   "Do not confuse anxiety relief with evidence. A role must beat the freedom. A side experiment must earn its hours. The point of this window is to create enough options that the next move is chosen deliberately.";
+
+/**
+ * The Day 30 board scorecard's lanes. Scored on evidence, not on the story you
+ * want to be true. Each lane ends in keep, pause, or kill.
+ */
+export type Lane = { key: string; name: string; evidence: string };
+
+export const LANES: Lane[] = [
+  {
+    key: "role_market",
+    name: "Role market",
+    evidence:
+      "How many high-conviction processes? Which target-role bucket is pulling? Do the strongest roles pass all three beat-the-freedom gates?",
+  },
+  {
+    key: "advisory",
+    name: "Advisory revenue",
+    evidence:
+      "Any paid pilot, proposal, or buyer urgency? What measurable commercial result are you being asked to own? What proof would the engagement create?",
+  },
+  {
+    key: "network",
+    name: "Opportunity network",
+    evidence:
+      "Beyond raw count, which relationships are generating introductions, buyer access, role access, or repeated invitations?",
+  },
+  {
+    key: "writing",
+    name: "Writing",
+    evidence:
+      "What shipped? Did it create conversations, inbound, introductions, or clearer positioning?",
+  },
+  {
+    key: "substance",
+    name: "Return to Substance",
+    evidence:
+      "What repeated across operator interviews? Did anyone commit to a workflow experiment?",
+  },
+  {
+    key: "rabbi_ari",
+    name: "Rabbi Ari",
+    evidence:
+      "Who used it repeatedly? Who missed it? What would users keep? Any willingness to pay or recommend?",
+  },
+  {
+    key: "energy",
+    name: "Energy",
+    evidence: "Which work made you more energized after doing it, not just before?",
+  },
+  {
+    key: "control",
+    name: "Control",
+    evidence:
+      "Which lane gives you structural ownership rather than dependence on one person's goodwill?",
+  },
+];
+
+/** What each optionality currency asks at review time. */
+export const CURRENCY_REVIEW: Record<string, string> = {
+  runway:
+    "What cash or contracted revenue did the period add? What near-term revenue is credible enough to extend the window?",
+  proof:
+    "What new evidence can you point to: sourced or closed work, measurable commercial impact, operator result, user behavior?",
+  relationships:
+    "Which important new relationships and introductions now exist that did not before? Which are likely to compound?",
+  reputation:
+    "What shipped, circulated, or was repeated by others? Did the work create inbound, introductions, or trust?",
+};
