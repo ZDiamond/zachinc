@@ -64,6 +64,25 @@ export function fmtTime(mins: number): string {
   return `${h}:${String(m).padStart(2, "0")} ${ampm}`;
 }
 
+/**
+ * Compact range for the timeline: "9:20-11:20a", "11:30a-12:15p".
+ * The meridiem is dropped from the start time when both ends share it, which
+ * keeps every row on one line at phone width.
+ */
+export function fmtRange(start: number, end: number): string {
+  const bare = (mins: number) => {
+    const h24 = Math.floor(mins / 60) % 24;
+    const m = mins % 60;
+    const h = h24 % 12 === 0 ? 12 : h24 % 12;
+    return `${h}:${String(m).padStart(2, "0")}`;
+  };
+  const suffix = (mins: number) => (Math.floor(mins / 60) % 24 >= 12 ? "p" : "a");
+  const sameHalf = suffix(start) === suffix(end);
+  return sameHalf
+    ? `${bare(start)}-${bare(end)}${suffix(end)}`
+    : `${bare(start)}${suffix(start)}-${bare(end)}${suffix(end)}`;
+}
+
 /** Merge overlapping or touching intervals. */
 export function mergeIntervals(list: Interval[]): Interval[] {
   const sorted = [...list].sort((a, b) => a.start - b.start);
