@@ -80,6 +80,16 @@ export async function getAccessToken(userId: string): Promise<string | null> {
   return json.access_token;
 }
 
+type GoogleAttendee = {
+  email?: string;
+  displayName?: string;
+  self?: boolean;
+  organizer?: boolean;
+  resource?: boolean;
+  optional?: boolean;
+  responseStatus?: string;
+};
+
 type GoogleEvent = {
   id: string;
   summary?: string;
@@ -88,7 +98,16 @@ type GoogleEvent = {
   eventType?: string;
   start?: { dateTime?: string; date?: string; timeZone?: string };
   end?: { dateTime?: string; date?: string };
-  attendees?: { self?: boolean; responseStatus?: string }[];
+  organizer?: { email?: string; displayName?: string; self?: boolean };
+  attendees?: GoogleAttendee[];
+};
+
+/** One meeting with other people in it, as the suggestion pass wants it. */
+export type MeetingWithPeople = {
+  id: string;
+  title: string;
+  date: string; // YYYY-MM-DD in the user's timezone
+  people: { email: string; name: string }[];
 };
 
 /**
@@ -123,6 +142,95 @@ function localMinutes(iso: string, timeZone: string): number {
   const h = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
   const m = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
   return (h % 24) * 60 + m;
+}
+
+/**
+ * Meetings across a date range that had other people in them.
+ *
+ * Solo blocks, all-day markers, and anything Zach declined are skipped, as are
+ * large meetings: a twenty-person webinar is not a relationship, and treating
+ * it as one is how a CRM fills with noise.
+ */
+export async function fetchMeetingsInRange(
+  userId: string,
+  fromDate: string,
+  toDate: string,
+  timeZone: string,
+  maxAttendees = 6
+): Promise<{ meetings: MeetingWithPeople[]; error?: string }> {
+  const missing = missingCalendarEnv();
+  if (missing.length) return { meetings: [], error: `missing_env:${missing.join(",")}` };
+
+  let token: string | null = null;
+  try {
+    token = await getAccessToken(userId);
+  } catch {
+    return { meetings: [], error: "token_refresh_failed" };
+  }
+  if (!token) return { meetings: [], error: "not_connected" };
+
+  const url = new URL(EVENTS_URL);
+  url.searchParams.set("timeMin", `${fromDate}T00:00:00${utcOffset(fromDate, timeZone)}`);
+  url.searchParams.set("timeMax", `${toDate}T23:59:59${utcOffset(toDate, timeZone)}`);
+  url.searchParams.set("timeZone", timeZone);
+  url.searchParams.set("singleEvents", "true");
+  url.searchParams.set("orderBy", "startTime");
+  url.searchParams.set("maxResults", "250");
+
+  let json: { items?: GoogleEvent[] };
+  try {
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      if (res.status === 401) return { meetings: [], error: "reauth_needed" };
+      return { meetings: [], error: `google_${res.status}` };
+    }
+    json = (await res.json()) as { items?: GoogleEvent[] };
+  } catch {
+    return { meetings: [], error: "google_unreachable" };
+  }
+
+  const meetings: MeetingWithPeople[] = [];
+
+  for (const item of json.items ?? []) {
+    if (item.status === "cancelled") continue;
+    if (item.eventType === "birthday" || item.eventType === "workingLocation") continue;
+    if (!item.start?.dateTime) continue; // all-day entries are not meetings
+
+    const self = item.attendees?.find((a) => a.self);
+    if (self?.responseStatus === "declined") continue;
+
+    const attendees = item.attendees ?? [];
+    if (attendees.length === 0) continue; // a solo block on the calendar
+    if (attendees.length > maxAttendees) continue; // a broadcast, not a relationship
+
+    const people = attendees
+      .filter((a) => !a.self && !a.resource && a.email)
+      .filter((a) => a.responseStatus !== "declined")
+      .map((a) => ({
+        email: (a.email ?? "").toLowerCase().trim(),
+        name: (a.displayName ?? "").trim(),
+      }))
+      .filter((a) => a.email && !a.email.endsWith("calendar.google.com"));
+
+    if (people.length === 0) continue;
+
+    meetings.push({
+      id: item.id,
+      title: item.summary?.trim() || "(untitled)",
+      date: new Intl.DateTimeFormat("en-CA", {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date(item.start.dateTime)),
+      people,
+    });
+  }
+
+  return { meetings };
 }
 
 /**

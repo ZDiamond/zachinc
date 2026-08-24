@@ -10,6 +10,8 @@ export type Opportunity = {
   id: string;
   name: string;
   org: string;
+  /** Captured when a record is added from a calendar suggestion. */
+  email: string;
   lane: string;
   tier: number | null;
   strength: number | null;

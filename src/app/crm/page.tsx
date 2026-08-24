@@ -1,9 +1,12 @@
 import { requireUser } from "@/lib/auth";
-import { isoDate, formatLong } from "@/lib/dates";
+import { isoDate, formatLong, addDays, TZ } from "@/lib/dates";
+import { fetchMeetingsInRange } from "@/lib/google";
+import { buildSuggestions } from "@/lib/suggestions";
 import { missingCoreEnv } from "@/lib/env";
 import { LANES, type Opportunity } from "@/lib/crm";
 import Header from "@/components/Header";
 import Crm from "@/components/Crm";
+import CalendarSuggestions from "@/components/CalendarSuggestions";
 import SetupNeeded from "@/components/SetupNeeded";
 
 export const dynamic = "force-dynamic";
@@ -15,17 +18,41 @@ export default async function CrmPage() {
   const { user, supabase } = await requireUser();
   const today = isoDate();
 
-  const { data } = await supabase
-    .from("opportunities")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: true });
+  // Look back two weeks and forward one: recent meetings are the ones Zach can
+  // still judge, and upcoming ones are worth having in the CRM before they happen.
+  const [oppRes, ignoredRes, calendar] = await Promise.all([
+    supabase
+      .from("opportunities")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true }),
+    supabase.from("ignored_contacts").select("email").eq("user_id", user.id),
+    fetchMeetingsInRange(user.id, addDays(today, -14), addDays(today, 7), TZ),
+  ]);
 
-  const rows = (data ?? []) as Opportunity[];
+  const rows = (oppRes.data ?? []) as Opportunity[];
+
+  const { newPeople, contactUpdates } = buildSuggestions({
+    meetings: calendar.meetings,
+    opportunities: rows,
+    ignoredEmails: (ignoredRes.data ?? []).map((r: { email: string }) => r.email),
+    today,
+  });
 
   return (
     <>
       <Header dateLabel={formatLong(today)} phase="Opportunity CRM" active="crm" />
+
+      {newPeople.length || contactUpdates.length || calendar.error ? (
+        <section>
+          <CalendarSuggestions
+            userId={user.id}
+            newPeople={newPeople}
+            contactUpdates={contactUpdates}
+            error={calendar.error ?? null}
+          />
+        </section>
+      ) : null}
 
       <section>
         <Crm userId={user.id} today={today} initial={rows} />
