@@ -12,6 +12,7 @@ import {
 } from "@/lib/plan";
 import Header from "@/components/Header";
 import ReviewNotes from "@/components/ReviewNotes";
+import { scoreAngles, readout, type Angle, type Piece } from "@/lib/voice";
 import SetupNeeded from "@/components/SetupNeeded";
 import { missingCoreEnv } from "@/lib/env";
 
@@ -66,7 +67,7 @@ export default async function ReviewPage({
   const periodStart = idx === 0 ? START : addDays(CHECKPOINTS[idx - 1].date, 1);
   const periodEnd = checkpoint.date;
 
-  const [daysRes, weeksRes, reviewRes] = await Promise.all([
+  const [daysRes, weeksRes, reviewRes, angleRes, pieceRes] = await Promise.all([
     supabase
       .from("days")
       .select("date, ceo_close, commercial_proof, outcomes, outcomes_done")
@@ -87,7 +88,18 @@ export default async function ReviewPage({
       .eq("user_id", user.id)
       .eq("checkpoint_day", checkpoint.day)
       .maybeSingle(),
+    supabase.from("angles").select("*").eq("user_id", user.id).order("sort", { ascending: true }),
+    supabase
+      .from("pieces")
+      .select("*")
+      .eq("user_id", user.id)
+      .lte("shipped_on", periodEnd)
+      .order("shipped_on", { ascending: true }),
   ]);
+
+  const angles = (angleRes.data ?? []) as Angle[];
+  const shippedPieces = ((pieceRes.data ?? []) as Piece[]).filter((p) => p.status === "shipped");
+  const angleScores = scoreAngles(angles, shippedPieces);
 
   const days = (daysRes.data ?? []) as DayRow[];
   const weeks = (weeksRes.data ?? []) as WeekRow[];
@@ -328,6 +340,42 @@ export default async function ReviewPage({
           </div>
         </section>
       ) : null}
+
+      <section>
+        <div className="sec-h">
+          <h2>The voice experiment</h2>
+          <span className="sec-note">
+            {shippedPieces.length} piece{shippedPieces.length === 1 ? "" : "s"} shipped
+          </span>
+        </div>
+        <p className="readout">{readout(angleScores)}</p>
+        {shippedPieces.length > 0 ? (
+          <div className="blocks" style={{ marginTop: 12 }}>
+            {angleScores
+              .filter((a) => a.shipped > 0)
+              .map((a) => (
+                <div className="blk" key={a.angle.id}>
+                  <time>{a.shipped} shipped</time>
+                  <span className="b-name" style={{ width: 210 }}>{a.angle.name}</span>
+                  <span className="b-what">
+                    {a.wantedNext} made you want the next one, {a.createdPull} created pull
+                  </span>
+                </div>
+              ))}
+          </div>
+        ) : null}
+        {shippedPieces.some((p) => p.response_notes.trim()) ? (
+          <div className="notes">
+            {shippedPieces
+              .filter((p) => p.response_notes.trim())
+              .map((p) => (
+                <p key={p.id}>
+                  <b>{p.title}:</b> {p.response_notes}
+                </p>
+              ))}
+          </div>
+        ) : null}
+      </section>
 
       <section>
         <div className="sec-h">
