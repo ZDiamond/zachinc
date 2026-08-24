@@ -115,6 +115,7 @@ create index if not exists todos_open_idx on todos (user_id, done, sort);
 create or replace function touch_updated_at()
 returns trigger
 language plpgsql
+set search_path = ''
 as $$
 begin
   new.updated_at = now();
