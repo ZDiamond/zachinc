@@ -1,4 +1,6 @@
 import LoginButton from "@/components/LoginButton";
+import SetupNeeded from "@/components/SetupNeeded";
+import { missingCoreEnv } from "@/lib/env";
 
 const MESSAGES: Record<string, string> = {
   not_allowed: "That Google account is not the one this board belongs to.",
@@ -12,6 +14,9 @@ export default function LoginPage({
 }: {
   searchParams: { error?: string };
 }) {
+  const missing = missingCoreEnv();
+  if (missing.length) return <SetupNeeded missing={missing} />;
+
   const err = searchParams.error;
   return (
     <div className="login">

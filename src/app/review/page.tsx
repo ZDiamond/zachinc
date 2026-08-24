@@ -12,6 +12,8 @@ import {
 } from "@/lib/plan";
 import Header from "@/components/Header";
 import ReviewNotes from "@/components/ReviewNotes";
+import SetupNeeded from "@/components/SetupNeeded";
+import { missingCoreEnv } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +48,9 @@ export default async function ReviewPage({
 }: {
   searchParams: { cp?: string };
 }) {
+  const missing = missingCoreEnv();
+  if (missing.length) return <SetupNeeded missing={missing} />;
+
   const { user, supabase } = await requireUser();
   const today = isoDate();
 

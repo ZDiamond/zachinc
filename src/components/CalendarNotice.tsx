@@ -23,9 +23,32 @@ export default function CalendarNotice({ error }: { error: string | null }) {
     );
   }
 
+  if (error.startsWith("missing_env:")) {
+    const vars = error.slice("missing_env:".length).split(",");
+    return (
+      <div className="notes">
+        <p>
+          Calendar access is not configured: {vars.join(", ")} {vars.length === 1 ? "is" : "are"} not
+          set on this deployment. Today is built as if nothing is booked.
+        </p>
+      </div>
+    );
+  }
+
+  const explain: Record<string, string> = {
+    token_refresh_failed:
+      "Google refused to refresh the access token. The client secret may be wrong, or access was revoked.",
+    google_unreachable: "Could not reach Google Calendar.",
+    google_403:
+      "Google returned 403. The Calendar API is probably not enabled on the Cloud project.",
+  };
+
   return (
     <div className="notes">
-      <p>Could not read the calendar ({error}). Today is built as if nothing is booked.</p>
+      <p>
+        {explain[error] ?? `Could not read the calendar (${error}).`} Today is built as if nothing is
+        booked.
+      </p>
     </div>
   );
 }

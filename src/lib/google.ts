@@ -7,6 +7,7 @@
  */
 
 import { supabaseAdmin } from "./supabase/server";
+import { missingCalendarEnv } from "./env";
 import type { CalendarEvent } from "./day";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -20,6 +21,7 @@ export async function storeRefreshToken(
   accessToken?: string,
   expiresIn?: number
 ) {
+  if (missingCalendarEnv().length) return;
   const admin = supabaseAdmin();
   await admin.from("google_tokens").upsert(
     {
@@ -35,6 +37,9 @@ export async function storeRefreshToken(
 
 /** A valid access token, refreshing only when the cached one is close to expiry. */
 export async function getAccessToken(userId: string): Promise<string | null> {
+  // Without the server-side credentials there is no way to reach Google. The
+  // board still works; it just plans the day as if nothing is booked.
+  if (missingCalendarEnv().length) return null;
   const admin = supabaseAdmin();
   const { data } = await admin
     .from("google_tokens")
@@ -110,7 +115,17 @@ export async function fetchDayEvents(
   isoDate: string,
   timeZone: string
 ): Promise<{ events: CalendarEvent[]; error?: string }> {
-  const token = await getAccessToken(userId);
+  const missing = missingCalendarEnv();
+  if (missing.length) {
+    return { events: [], error: `missing_env:${missing.join(",")}` };
+  }
+
+  let token: string | null = null;
+  try {
+    token = await getAccessToken(userId);
+  } catch {
+    return { events: [], error: "token_refresh_failed" };
+  }
   if (!token) return { events: [], error: "not_connected" };
 
   const url = new URL(EVENTS_URL);
@@ -121,16 +136,19 @@ export async function fetchDayEvents(
   url.searchParams.set("orderBy", "startTime");
   url.searchParams.set("maxResults", "50");
 
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  });
-
-  if (!res.ok) {
-    return { events: [], error: res.status === 401 ? "reauth_needed" : `google_${res.status}` };
+  let json: { items?: GoogleEvent[] };
+  try {
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      return { events: [], error: res.status === 401 ? "reauth_needed" : `google_${res.status}` };
+    }
+    json = (await res.json()) as { items?: GoogleEvent[] };
+  } catch {
+    return { events: [], error: "google_unreachable" };
   }
-
-  const json = (await res.json()) as { items?: GoogleEvent[] };
   const events: CalendarEvent[] = [];
 
   for (const item of json.items ?? []) {

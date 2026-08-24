@@ -31,6 +31,8 @@ import Optionality from "@/components/Optionality";
 import CeoClose from "@/components/CeoClose";
 import Checkpoints from "@/components/Checkpoints";
 import CalendarNotice from "@/components/CalendarNotice";
+import SetupNeeded from "@/components/SetupNeeded";
+import { missingCoreEnv } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +60,9 @@ const BANNERS: Record<string, { title: string; body: string }> = {
 };
 
 export default async function BoardPage() {
+  const missing = missingCoreEnv();
+  if (missing.length) return <SetupNeeded missing={missing} />;
+
   const { user, supabase } = await requireUser();
 
   const today = isoDate();
