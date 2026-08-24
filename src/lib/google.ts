@@ -91,6 +91,27 @@ type GoogleEvent = {
   attendees?: { self?: boolean; responseStatus?: string }[];
 };
 
+/**
+ * The UTC offset in effect in `timeZone` on `isoDate`, as "-05:00".
+ *
+ * Google requires timeMin and timeMax to carry an explicit offset; a bare
+ * local timestamp is rejected outright. The offset has to be computed per date
+ * because it shifts with daylight saving.
+ */
+function utcOffset(isoDate: string, timeZone: string): string {
+  // Probe at midday UTC so the calendar date is unambiguous in any zone.
+  const probe = new Date(`${isoDate}T12:00:00Z`);
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    timeZoneName: "longOffset",
+  }).formatToParts(probe);
+  const name = parts.find((p) => p.type === "timeZoneName")?.value ?? "";
+  const match = name.match(/GMT([+-]\d{2}:\d{2})/);
+  if (match) return match[1];
+  // Some runtimes render UTC itself as a bare "GMT".
+  return name === "GMT" ? "+00:00" : "+00:00";
+}
+
 /** Minutes past midnight for an RFC3339 instant, in the given timezone. */
 function localMinutes(iso: string, timeZone: string): number {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -128,9 +149,10 @@ export async function fetchDayEvents(
   }
   if (!token) return { events: [], error: "not_connected" };
 
+  const offset = utcOffset(isoDate, timeZone);
   const url = new URL(EVENTS_URL);
-  url.searchParams.set("timeMin", `${isoDate}T00:00:00`);
-  url.searchParams.set("timeMax", `${isoDate}T23:59:59`);
+  url.searchParams.set("timeMin", `${isoDate}T00:00:00${offset}`);
+  url.searchParams.set("timeMax", `${isoDate}T23:59:59${offset}`);
   url.searchParams.set("timeZone", timeZone);
   url.searchParams.set("singleEvents", "true");
   url.searchParams.set("orderBy", "startTime");
@@ -143,7 +165,17 @@ export async function fetchDayEvents(
       cache: "no-store",
     });
     if (!res.ok) {
-      return { events: [], error: res.status === 401 ? "reauth_needed" : `google_${res.status}` };
+      if (res.status === 401) return { events: [], error: "reauth_needed" };
+      // Google explains itself in the body. Carrying that through turns a bare
+      // status code into something actionable.
+      let detail = "";
+      try {
+        const body = (await res.json()) as { error?: { message?: string } };
+        detail = body.error?.message ? `: ${body.error.message.slice(0, 160)}` : "";
+      } catch {
+        // Non-JSON body. The status code is all we have.
+      }
+      return { events: [], error: `google_${res.status}${detail}` };
     }
     json = (await res.json()) as { items?: GoogleEvent[] };
   } catch {
