@@ -1,6 +1,6 @@
 import { requireUser } from "@/lib/auth";
 import { fetchDayEvents } from "@/lib/google";
-import { buildDay } from "@/lib/day";
+import { buildDay, splitWorkoutEvents } from "@/lib/day";
 import { defaultSessionFor, SESSIONS } from "@/lib/workout";
 import {
   TZ,
@@ -188,7 +188,8 @@ export default async function BoardPage() {
   // A normal working day.
   const focus = DAY_FOCUS[ctx.dow] ?? DAY_FOCUS[1];
   const scheduled = defaultSessionFor(ctx.dow);
-  const plan = buildDay({ dow: ctx.dow, events: calendar.events, session: scheduled });
+  const { workout: gymSlot, rest: dayEvents } = splitWorkoutEvents(calendar.events);
+  const plan = buildDay({ dow: ctx.dow, events: dayEvents, session: scheduled, workoutSlot: gymSlot });
 
   const floors = ctx.dow === 5 ? [...FLOORS_DAILY, ...FLOORS_FRIDAY] : FLOORS_DAILY;
 

@@ -246,10 +246,28 @@ function scorePlacement(gap: Interval, spec: WorkSpec, duration: number): { star
   return { start, score };
 }
 
+/**
+ * A calendar event titled "Gym" is Zach lifting, not a meeting. Pull it out so
+ * the day is built around it as the workout anchor instead of scheduling a
+ * second workout alongside a phantom meeting.
+ */
+export function splitWorkoutEvents(events: CalendarEvent[]): {
+  workout: Interval | null;
+  rest: CalendarEvent[];
+} {
+  const gym = events.find((e) => !e.allDay && /\bgym\b/i.test(e.title) && e.end > e.start);
+  return {
+    workout: gym ? { start: gym.start, end: gym.end } : null,
+    rest: gym ? events.filter((e) => e !== gym) : events,
+  };
+}
+
 export type BuildDayInput = {
   dow: number;
   events: CalendarEvent[];
   session?: Session;
+  /** When set (from a "Gym" calendar event), the workout goes here, full stop. */
+  workoutSlot?: Interval | null;
   /**
    * End of the working day. Work blocks are not scheduled past it. This is not
    * a rule Zach has to obey, it is the horizon the board plans against so that
@@ -288,13 +306,15 @@ export function buildDay(input: BuildDayInput): DayPlan {
     kind: "anchor",
   });
 
-  let workoutStart = morningEnd;
-  let workoutEnd = workoutStart + liftMinutes;
-  let workoutPlaced = liftMinutes > 0;
+  const gymSlot = input.workoutSlot ?? null;
+  let workoutStart = gymSlot ? gymSlot.start : morningEnd;
+  let workoutEnd = gymSlot ? gymSlot.end : workoutStart + liftMinutes;
+  let workoutPlaced = gymSlot ? true : liftMinutes > 0;
 
   // If a meeting collides with the default workout slot, move the workout
-  // rather than dropping it. The workout is an anchor, not filler.
-  if (liftMinutes > 0) {
+  // rather than dropping it. The workout is an anchor, not filler. A calendar
+  // "Gym" block skips all of this: Zach already decided when he is lifting.
+  if (!gymSlot && liftMinutes > 0) {
     const collision = timed.find((e) => e.start < workoutEnd && e.end > workoutStart);
     if (collision) {
       const earlier = freeGaps(wake, collision.start, [{ start: wake, end: morningEnd }]).find(
@@ -319,10 +339,14 @@ export function buildDay(input: BuildDayInput): DayPlan {
   }
 
   if (workoutPlaced) {
+    const asLift = gymSlot !== null || session.kind === "lift";
     blocks.push({
       key: "workout",
-      name: session.kind === "lift" ? "Lift" : "Movement",
-      what: `${session.name}. ${session.minutes}.`,
+      name: asLift ? "Lift" : "Movement",
+      what:
+        gymSlot && session.kind !== "lift"
+          ? "Gym block from the calendar. Log the session on the board."
+          : `${session.name}. ${session.minutes}.`,
       start: workoutStart,
       end: workoutEnd,
       kind: "anchor",
